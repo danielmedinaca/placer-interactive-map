@@ -298,17 +298,152 @@
     </div>
   </div>
 
-  <!-- GeoJSON Data Files are fetched from GitHub (via jsDelivr) inside the script below -->
 
   <script>
+
+    // =====================================================================
+    // HELPER FUNCTIONS
+    // =====================================================================
+
+    function normalizeDistrictName(value) {
+      return String(value || '').trim().toUpperCase();
+    }
+
+    function getDistrictCandidates(categoryKey, districtName) {
+      const districtNumber = (districtName.match(/\d+/) || [])[0];
+      if (!districtNumber || !CANDIDATES[categoryKey]) return [];
+      return CANDIDATES[categoryKey][`TRUSTEE AREA ${districtNumber}`] || [];
+    }
+
+    function getAllDistrictCandidates(categoryKey) {
+      return Object.values(CANDIDATES[categoryKey] || {}).flat();
+    }
+
+    function getElementaryCandidates(name) {
+      const normalizedName = normalizeDistrictName(name);
+      if (normalizedName === 'ROCKLIN UNIFIED SCHOOL DISTRICT') return getAllDistrictCandidates('rusd');
+      if (normalizedName === 'WESTERN PLACER UNIFIED SCHOOL DISTRICT') return getAllDistrictCandidates('westernPlacer');
+      if (normalizedName === 'ROSEVILLE CITY SCHOOL DISTRICT') return getAllDistrictCandidates('rcsd');
+      if (normalizedName === 'DRY CREEK JOINT ELEMENTARY SCHOOL DISTRICT') return getAllDistrictCandidates('dryCreek');
+      return CANDIDATES.elementary[name] || [];
+    }
+
+    function getHighSchoolCandidates(name) {
+      const normalizedName = normalizeDistrictName(name);
+      if (normalizedName === 'ROSEVILLE JOINT UNION HIGH') return getAllDistrictCandidates('rosevilleJointUnionHigh');
+      if (normalizedName === 'PLACER UNION HIGH') return getAllDistrictCandidates('placerUnionHigh');
+      return [];
+    }
+
+    function getCityCandidates(name) {
+      const normalizedName = normalizeDistrictName(name);
+      if (normalizedName === 'ROSEVILLE') return getAllDistrictCandidates('rosevilleCouncil');
+      return CANDIDATES.cities[normalizedName] || [];
+    }
+
+    function createCountyMask(geoJsonData) {
+      const worldOuterBounds = [[-180, 90], [180, 90], [180, -90], [-180, -90], [-180, 90]];
+      const feature = geoJsonData.features ? geoJsonData.features[0] : geoJsonData;
+      const countyHoles = feature.geometry.type === "Polygon"
+        ? feature.geometry.coordinates
+        : feature.geometry.coordinates[0];
+
+      return {
+        type: "Feature",
+        geometry: { type: "Polygon", coordinates: [worldOuterBounds, ...countyHoles] }
+      };
+    }
+
+    function buildPopupContent(name, candidates, accentColor, type = "district", message = "") {
+      const labels = {
+        cities: { heading: 'City Council', empty: 'city' },
+        supervisorial: { heading: 'Board of Supervisors', empty: 'supervisorial district' },
+        district: { heading: 'Endorsed', empty: 'district' }
+      };
+      const labelConfig = labels[type] || labels.district;
+
+      let html = `<div style="font-family: sans-serif; min-width: 200px;">`;
+      html += `<h3 class="popup-heading" style="color: ${type === 'cities' || type === 'supervisorial' ? '#333' : COLORS.text.primary}; border-bottom-color: ${accentColor};">${name}</h3>`;
+
+      if (type === 'supervisorial') {
+        html += `<p class="popup-empty">${message}</p>`;
+        html += `</div>`;
+        return html;
+      }
+
+      html += `<strong style="color: #2c3e50; font-size: 13px;">${labelConfig.heading} Candidates:</strong>`;
+
+      if (candidates.length > 0) {
+        html += `<ul class="popup-list">`;
+        candidates.forEach(c => {
+          html += `<li><strong>${c.name}</strong><br/>`;
+          html += `<span style="color: ${COLORS.text.secondary}; font-size: 11px;">${c.position}</span>`;
+          if (c.website) {
+            html += `<br/><a href="${c.website}" target="_blank" rel="noopener" style="color: ${accentColor};">Campaign Site &rarr;</a>`;
+          }
+          html += `</li>`;
+        });
+        html += `</ul>`;
+      } else {
+        html += `<p class="popup-empty">No candidate endorsements listed for this ${labelConfig.empty}.</p>`;
+      }
+
+      html += `</div>`;
+      return html;
+    }
+
+    function addLayerInteractivity(layer, tooltipText, accentColor, hoverStyle, defaultStyle, tooltipSubtext = "Click for candidates") {
+      layer.bindTooltip(`<div style="text-align: center; font-family: sans-serif;"><b>${tooltipText}</b><div style="font-size: 11px; color: ${accentColor}; margin-top: 2px;">${tooltipSubtext}</div></div>`, {
+        sticky: true,
+        direction: "top",
+        opacity: 0.95
+      });
+
+      const applySvgStyle = (el, styleObj) => {
+        if (!el) return;
+        if (styleObj.fillOpacity !== undefined) el.setAttribute('fill-opacity', styleObj.fillOpacity);
+        if (styleObj.fillColor !== undefined) el.setAttribute('fill', styleObj.fillColor);
+        if (styleObj.weight !== undefined) el.setAttribute('stroke-width', styleObj.weight);
+        if (styleObj.color !== undefined) el.setAttribute('stroke', styleObj.color);
+      };
+
+      layer.on({
+        mouseover: () => {
+          applySvgStyle(layer._path, hoverStyle);
+          layer.bringToFront();
+        },
+        mouseout: () => {
+          if (!layer.isPopupOpen()) {
+            applySvgStyle(layer._path, defaultStyle);
+          }
+        },
+        popupopen: () => {
+          applySvgStyle(layer._path, hoverStyle);
+        },
+        popupclose: () => {
+          applySvgStyle(layer._path, defaultStyle);
+        }
+      });
+    }
+
+    // =====================================================================
+    // DATA LOADING - GeoJSON FILES HOSTED ON GITHUB VIA JSDELIVR
+    // =====================================================================
+
+    const DATA_BASE_URL = 'https://cdn.jsdelivr.net/gh/danielmedinaca/placer-interactive-map@main';
+
+    function loadGeoJSON(fileName) {
+      return fetch(`${DATA_BASE_URL}/${fileName}`).then((response) => response.json());
+    }
+
     // =====================================================================
     // CONFIGURATION & CONSTANTS
     // =====================================================================
 
     const CONFIG = {
       map: {
-        center: [38.8966, -121.0772],
-        defaultZoom: 9,
+        center: [39.01, -120.68],
+        defaultZoom: 10,
         searchZoom: 14
       },
       tiles: {
@@ -596,168 +731,6 @@
       }
     };
 
-    // =====================================================================
-    // HELPER FUNCTIONS
-    // =====================================================================
-
-    function normalizeDistrictName(value) {
-      return String(value || '').trim().toUpperCase();
-    }
-
-    function getAreaCandidates(areaMap, name) {
-      const districtNumber = Number((name.match(/\d+/) || [])[0]);
-      return areaMap[`TRUSTEE AREA ${districtNumber}`] || [];
-    }
-
-    function getAllAreaCandidates(areaMap) {
-      return Object.values(areaMap).flat();
-    }
-
-    function getElementaryCandidates(name) {
-      const normalizedName = normalizeDistrictName(name);
-      if (normalizedName === 'ROCKLIN UNIFIED SCHOOL DISTRICT') return getAllAreaCandidates(CANDIDATES.rusd);
-      if (normalizedName === 'WESTERN PLACER UNIFIED SCHOOL DISTRICT') return getAllAreaCandidates(CANDIDATES.westernPlacer);
-      if (normalizedName === 'ROSEVILLE CITY SCHOOL DISTRICT') return getAllAreaCandidates(CANDIDATES.rcsd);
-      if (normalizedName === 'DRY CREEK JOINT ELEMENTARY SCHOOL DISTRICT') return getAllAreaCandidates(CANDIDATES.dryCreek);
-      return CANDIDATES.elementary[name] || [];
-    }
-
-    function getRusdCandidates(name) {
-      return getAreaCandidates(CANDIDATES.rusd, name);
-    }
-
-    function getRjuhsdCandidates(name) {
-      return getAreaCandidates(CANDIDATES.rosevilleJointUnionHigh, name);
-    }
-
-    function getRcsdCandidates(name) {
-      return getAreaCandidates(CANDIDATES.rcsd, name);
-    }
-
-    function getWesternPlacerCandidates(name) {
-      return getAreaCandidates(CANDIDATES.dryCreek, name);
-    }
-
-    function getDryCreekCandidates(name) {
-      return getAreaCandidates(CANDIDATES.dryCreek, name);
-    }
-
-    function getHighSchoolCandidates(name) {
-      const normalizedName = normalizeDistrictName(name);
-      if (normalizedName === 'ROSEVILLE JOINT UNION HIGH') return getAllAreaCandidates(CANDIDATES.rosevilleJointUnionHigh);
-      if (normalizedName === 'PLACER UNION HIGH') return getAllAreaCandidates(CANDIDATES.placerUnionHigh);
-      return [];
-    }
-
-    function getSierraCollegeCandidates(name) {
-      return getAreaCandidates(CANDIDATES.sierraCollege, name);
-    }
-
-    function getAllSierraCollegeCandidates() {
-      return getAllAreaCandidates(CANDIDATES.sierraCollege);
-    }
-
-    function getCityCandidates(name) {
-      const normalizedName = normalizeDistrictName(name);
-      if (normalizedName === 'ROSEVILLE') return getAllAreaCandidates(CANDIDATES.rosevilleCouncil);
-      return CANDIDATES.cities[normalizedName] || [];
-    }
-
-    function createCountyMask(geoJsonData) {
-      const worldOuterBounds = [[-180, 90], [180, 90], [180, -90], [-180, -90], [-180, 90]];
-      const feature = geoJsonData.features ? geoJsonData.features[0] : geoJsonData;
-      const countyHoles = feature.geometry.type === "Polygon"
-        ? feature.geometry.coordinates
-        : feature.geometry.coordinates[0];
-
-      return {
-        type: "Feature",
-        geometry: { type: "Polygon", coordinates: [worldOuterBounds, ...countyHoles] }
-      };
-    }
-
-    function buildPopupContent(name, candidates, accentColor, type = "district", message = "") {
-      const labels = {
-        cities: { heading: 'City Council', empty: 'city' },
-        supervisorial: { heading: 'Board of Supervisors', empty: 'supervisorial district' },
-        district: { heading: 'Endorsed', empty: 'district' }
-      };
-      const labelConfig = labels[type] || labels.district;
-
-      let html = `<div style="font-family: sans-serif; min-width: 200px;">`;
-      html += `<h3 class="popup-heading" style="color: ${type === 'cities' || type === 'supervisorial' ? '#333' : COLORS.text.primary}; border-bottom-color: ${accentColor};">${name}</h3>`;
-
-      if (type === 'supervisorial') {
-        html += `<p class="popup-empty">${message}</p>`;
-        html += `</div>`;
-        return html;
-      }
-
-      html += `<strong style="color: #2c3e50; font-size: 13px;">${labelConfig.heading} Candidates:</strong>`;
-
-      if (candidates.length > 0) {
-        html += `<ul class="popup-list">`;
-        candidates.forEach(c => {
-          html += `<li><strong>${c.name}</strong><br/>`;
-          html += `<span style="color: ${COLORS.text.secondary}; font-size: 11px;">${c.position}</span>`;
-          if (c.website) {
-            html += `<br/><a href="${c.website}" target="_blank" rel="noopener" style="color: ${accentColor};">Campaign Site &rarr;</a>`;
-          }
-          html += `</li>`;
-        });
-        html += `</ul>`;
-      } else {
-        html += `<p class="popup-empty">No candidate endorsements listed for this ${labelConfig.empty}.</p>`;
-      }
-
-      html += `</div>`;
-      return html;
-    }
-
-    function addLayerInteractivity(layer, tooltipText, accentColor, hoverStyle, defaultStyle, tooltipSubtext = "Click for candidates") {
-      layer.bindTooltip(`<div style="text-align: center; font-family: sans-serif;"><b>${tooltipText}</b><div style="font-size: 11px; color: ${accentColor}; margin-top: 2px;">${tooltipSubtext}</div></div>`, {
-        sticky: true,
-        direction: "top",
-        opacity: 0.95
-      });
-
-      const applySvgStyle = (el, styleObj) => {
-        if (!el) return;
-        if (styleObj.fillOpacity !== undefined) el.setAttribute('fill-opacity', styleObj.fillOpacity);
-        if (styleObj.fillColor !== undefined) el.setAttribute('fill', styleObj.fillColor);
-        if (styleObj.weight !== undefined) el.setAttribute('stroke-width', styleObj.weight);
-        if (styleObj.color !== undefined) el.setAttribute('stroke', styleObj.color);
-      };
-
-      layer.on({
-        mouseover: () => {
-          applySvgStyle(layer._path, hoverStyle);
-          layer.bringToFront();
-        },
-        mouseout: () => {
-          if (!layer.isPopupOpen()) {
-            applySvgStyle(layer._path, defaultStyle);
-          }
-        },
-        popupopen: () => {
-          applySvgStyle(layer._path, hoverStyle);
-        },
-        popupclose: () => {
-          applySvgStyle(layer._path, defaultStyle);
-        }
-      });
-    }
-
-    // =====================================================================
-    // DATA LOADING - GeoJSON FILES HOSTED ON GITHUB VIA JSDELIVR
-    // =====================================================================
-
-    const DATA_BASE_URL = 'https://cdn.jsdelivr.net/gh/danielmedinaca/placer-interactive-map@main';
-
-    function loadGeoJSON(fileName) {
-      return fetch(`${DATA_BASE_URL}/${fileName}`).then((response) => response.json());
-    }
-
     (async function initMap() {
 
     const [
@@ -816,6 +789,49 @@
     L.geoJSON(placerCounty, { style: STYLES.county.fill }).addTo(map);
 
     // =====================================================================
+    // DRILL DOWN / DRILL UP HELPERS - toggle between a parent layer and a
+    // more granular sub-district layer
+    // =====================================================================
+
+    function addDrillDownHandler(layer, getParentLayer, getChildLayer) {
+      layer.on('click', (event) => {
+        L.DomEvent.stopPropagation(event);
+
+        const parentLayer = getParentLayer();
+        const childLayer = getChildLayer();
+
+        if (map.hasLayer(parentLayer)) {
+          map.removeLayer(parentLayer);
+        }
+
+        if (!map.hasLayer(childLayer)) {
+          childLayer.addTo(map);
+        }
+
+        map.fitBounds(layer.getBounds());
+      });
+    }
+
+    function addDrillUpHandler(childLayer, parentLayer) {
+      map.on('click', (event) => {
+        if (!map.hasLayer(childLayer)) return;
+
+        const clickPoint = turf.point([event.latlng.lng, event.latlng.lat]);
+        const isInside = childLayer.toGeoJSON().features.some((feature) => turf.booleanPointInPolygon(clickPoint, feature));
+
+        if (isInside) return;
+
+        map.removeLayer(childLayer);
+
+        if (!map.hasLayer(parentLayer)) {
+          parentLayer.addTo(map);
+        }
+
+        map.setView(CONFIG.map.center, CONFIG.map.defaultZoom);
+      });
+    }
+
+    // =====================================================================
     // LAYER SETUP - ELEMENTARY SCHOOL DISTRICTS PARENT LAYER
     // =====================================================================
 
@@ -834,69 +850,10 @@
         addLayerInteractivity(layer, name, COLORS.elementary.fill, STYLES.elementary.hover, STYLES.elementary.default);
         layer.bindPopup(buildPopupContent(name, candidates, '#2178C1'));
 
-        if (isWesternPlacer) {
-          layer.on('click', (event) => {
-            L.DomEvent.stopPropagation(event);
-
-            if (map.hasLayer(ElementarySchoolDistrictsGeoLayer)) {
-              map.removeLayer(ElementarySchoolDistrictsGeoLayer);
-            }
-
-            if (!map.hasLayer(westernPlacerDistrictsGeoLayer)) {
-              westernPlacerDistrictsGeoLayer.addTo(map);
-            }
-
-            map.fitBounds(layer.getBounds());
-          });
-        }
-
-        if (isRusd) {
-          layer.on('click', (event) => {
-            L.DomEvent.stopPropagation(event);
-
-            if (map.hasLayer(ElementarySchoolDistrictsGeoLayer)) {
-              map.removeLayer(ElementarySchoolDistrictsGeoLayer);
-            }
-
-            if (!map.hasLayer(rusdGeoLayer)) {
-              rusdGeoLayer.addTo(map);
-            }
-
-            map.fitBounds(layer.getBounds());
-          });
-        }
-
-        if (isRcsd) {
-          layer.on('click', (event) => {
-            L.DomEvent.stopPropagation(event);
-
-            if (map.hasLayer(ElementarySchoolDistrictsGeoLayer)) {
-              map.removeLayer(ElementarySchoolDistrictsGeoLayer);
-            }
-
-            if (!map.hasLayer(rcsdGeoLayer)) {
-              rcsdGeoLayer.addTo(map);
-            }
-
-            map.fitBounds(layer.getBounds());
-          });
-        }
-
-        if (isDryCreek) {
-          layer.on('click', (event) => {
-            L.DomEvent.stopPropagation(event);
-
-            if (map.hasLayer(ElementarySchoolDistrictsGeoLayer)) {
-              map.removeLayer(ElementarySchoolDistrictsGeoLayer);
-            }
-
-            if (!map.hasLayer(DryCreekDistrictsGeoLayer)) {
-              DryCreekDistrictsGeoLayer.addTo(map);
-            }
-
-            map.fitBounds(layer.getBounds());
-          });
-        }
+        if (isWesternPlacer) addDrillDownHandler(layer, () => ElementarySchoolDistrictsGeoLayer, () => westernPlacerDistrictsGeoLayer);
+        if (isRusd) addDrillDownHandler(layer, () => ElementarySchoolDistrictsGeoLayer, () => rusdGeoLayer);
+        if (isRcsd) addDrillDownHandler(layer, () => ElementarySchoolDistrictsGeoLayer, () => rcsdGeoLayer);
+        if (isDryCreek) addDrillDownHandler(layer, () => ElementarySchoolDistrictsGeoLayer, () => DryCreekDistrictsGeoLayer);
       }
     }).addTo(map);
 
@@ -913,37 +870,13 @@
 
         addLayerInteractivity(layer, districtName, COLORS.westernPlacer.fill, STYLES.westernPlacer.hover, STYLES.westernPlacer.default);
         layer.bindPopup(buildPopupContent(districtName, candidates, '#2E9E6B'));
-
-        layer.on('click', (event) => {
-          L.DomEvent.stopPropagation(event);
-        });
       }
     });
 
-    map.on('click', (event) => {
-      if (!map.hasLayer(westernPlacerDistrictsGeoLayer)) return;
+    addDrillUpHandler(westernPlacerDistrictsGeoLayer, ElementarySchoolDistrictsGeoLayer);
 
-      let hitDistrict = false;
-      westernPlacerDistrictsGeoLayer.eachLayer((districtLayer) => {
-        if (!hitDistrict && districtLayer.feature && turf.booleanPointInPolygon(
-          turf.point([event.latlng.lng, event.latlng.lat]),
-          districtLayer.feature
-        )) {
-          hitDistrict = true;
-        }
-      });
-
-      if (hitDistrict) return;
-
-      map.removeLayer(westernPlacerDistrictsGeoLayer);
-
-      if (!map.hasLayer(ElementarySchoolDistrictsGeoLayer)) {
-        ElementarySchoolDistrictsGeoLayer.addTo(map);
-      }
-    });
-  
     // =====================================================================
-    // LAYER SETUP - ROCKLIN UNIFIED SCHOOL DISTRICT ADOPTED MAP 117
+    // LAYER SETUP - ROCKLIN UNIFIED SCHOOL DISTRICTS
     // =====================================================================
 
     rusdGeoLayer = L.geoJSON(RUSDDistricts, {
@@ -951,34 +884,14 @@
       onEachFeature: (feature, layer) => {
         const districtNumber = feature.properties && feature.properties.DISTRICT;
         const districtName = districtNumber ? `RUSD DISTRICT ${districtNumber}` : 'RUSD DISTRICT';
-        const candidates = getRusdCandidates(districtName);
+        const candidates = getDistrictCandidates('rusd', districtName);
 
         addLayerInteractivity(layer, districtName, COLORS.rusd.fill, STYLES.rusd.hover, STYLES.rusd.default);
         layer.bindPopup(buildPopupContent(districtName, candidates, COLORS.rusd.fill));
       }
     });
 
-    map.on('click', (event) => {
-      if (!map.hasLayer(rusdGeoLayer)) return;
-
-      let hitDistrict = false;
-      rusdGeoLayer.eachLayer((districtLayer) => {
-        if (!hitDistrict && districtLayer.feature && turf.booleanPointInPolygon(
-          turf.point([event.latlng.lng, event.latlng.lat]),
-          districtLayer.feature
-        )) {
-          hitDistrict = true;
-        }
-      });
-
-      if (hitDistrict) return;
-
-      map.removeLayer(rusdGeoLayer);
-
-      if (!map.hasLayer(ElementarySchoolDistrictsGeoLayer)) {
-        ElementarySchoolDistrictsGeoLayer.addTo(map);
-      }
-    });
+    addDrillUpHandler(rusdGeoLayer, ElementarySchoolDistrictsGeoLayer);
 
     // =====================================================================
     // LAYER SETUP - ROSEVILLE CITY SCHOOL DISTRICT TRUSTEE AREAS
@@ -989,34 +902,14 @@
       onEachFeature: (feature, layer) => {
         const districtNumber = feature.properties && feature.properties.DISTRICT;
         const districtName = districtNumber ? `RCSD TRUSTEE AREA ${districtNumber}` : 'RCSD TRUSTEE AREA';
-        const candidates = getRcsdCandidates(districtName);
+        const candidates = getDistrictCandidates('rcsd', districtName);
 
         addLayerInteractivity(layer, districtName, COLORS.rcsd.fill, STYLES.rcsd.hover, STYLES.rcsd.default);
         layer.bindPopup(buildPopupContent(districtName, candidates, COLORS.rcsd.fill));
       }
     });
 
-    map.on('click', (event) => {
-      if (!map.hasLayer(rcsdGeoLayer)) return;
-
-      let hitDistrict = false;
-      rcsdGeoLayer.eachLayer((districtLayer) => {
-        if (!hitDistrict && districtLayer.feature && turf.booleanPointInPolygon(
-          turf.point([event.latlng.lng, event.latlng.lat]),
-          districtLayer.feature
-        )) {
-          hitDistrict = true;
-        }
-      });
-
-      if (hitDistrict) return;
-
-      map.removeLayer(rcsdGeoLayer);
-
-      if (!map.hasLayer(ElementarySchoolDistrictsGeoLayer)) {
-        ElementarySchoolDistrictsGeoLayer.addTo(map);
-      }
-    });
+    addDrillUpHandler(rcsdGeoLayer, ElementarySchoolDistrictsGeoLayer);
 
     // =====================================================================
     // LAYER SETUP - DRY CREEK JOINT DISTRICT TRUSTEE AREAS
@@ -1027,34 +920,15 @@
       onEachFeature: (feature, layer) => {
         const districtNumber = feature.properties && feature.properties.name;
         const districtName = districtNumber ? `TRUSTEE AREA ${districtNumber}` : 'DCJESD TRUSTEE AREA';
-        const candidates = getDryCreekCandidates(districtName);
+        const candidates = getDistrictCandidates('dryCreek', districtName);
 
         addLayerInteractivity(layer, districtName, COLORS.rcsd.fill, STYLES.rcsd.hover, STYLES.rcsd.default);
         layer.bindPopup(buildPopupContent(districtName, candidates, COLORS.rcsd.fill));
       }
     });
 
-    map.on('click', (event) => {
-      if (!map.hasLayer(DryCreekDistrictsGeoLayer)) return;
+    addDrillUpHandler(DryCreekDistrictsGeoLayer, ElementarySchoolDistrictsGeoLayer);
 
-      let hitDistrict = false;
-      DryCreekDistrictsGeoLayer.eachLayer((districtLayer) => {
-        if (!hitDistrict && districtLayer.feature && turf.booleanPointInPolygon(
-          turf.point([event.latlng.lng, event.latlng.lat]),
-          districtLayer.feature
-        )) {
-          hitDistrict = true;
-        }
-      });
-
-      if (hitDistrict) return;
-
-      map.removeLayer(DryCreekDistrictsGeoLayer);
-
-      if (!map.hasLayer(ElementarySchoolDistrictsGeoLayer)) {
-        ElementarySchoolDistrictsGeoLayer.addTo(map);
-      }
-    });
     // =====================================================================
     // LAYER SETUP - HIGH SCHOOL DISTRICTS
     // =====================================================================
@@ -1071,36 +945,8 @@
         addLayerInteractivity(layer, `${name} SCHOOL DISTRICT`, COLORS.highSchool.fill, STYLES.highSchool.hover, STYLES.highSchool.default);
         layer.bindPopup(buildPopupContent(name, candidates, '#2178C1'));
 
-        if (isPlacerUnionHigh) {
-          layer.on('click', (event) => {
-            L.DomEvent.stopPropagation(event);
-
-            if (map.hasLayer(highSchoolDistrictsGeoLayer)) {
-              map.removeLayer(highSchoolDistrictsGeoLayer);
-            }
-
-            if (!map.hasLayer(placerUnionHighDistrictsGeoLayer)) {
-              placerUnionHighDistrictsGeoLayer.addTo(map);
-            }
-
-            map.fitBounds(layer.getBounds());
-          });
-        }
-        if (isRosevilleJointUnionHigh) {
-          layer.on('click', (event) => {
-            L.DomEvent.stopPropagation(event);
-
-            if (map.hasLayer(highSchoolDistrictsGeoLayer)) {
-              map.removeLayer(highSchoolDistrictsGeoLayer);
-            }
-
-            if (!map.hasLayer(rosevilleJointUnionHighDistrictsGeoLayer)) {
-              rosevilleJointUnionHighDistrictsGeoLayer.addTo(map);
-            }
-
-            map.fitBounds(layer.getBounds());
-          });
-        }
+        if (isPlacerUnionHigh) addDrillDownHandler(layer, () => highSchoolDistrictsGeoLayer, () => placerUnionHighDistrictsGeoLayer);
+        if (isRosevilleJointUnionHigh) addDrillDownHandler(layer, () => highSchoolDistrictsGeoLayer, () => rosevilleJointUnionHighDistrictsGeoLayer);
       }
     });
 
@@ -1113,33 +959,9 @@
 
         addLayerInteractivity(layer, districtName, COLORS.placerUnionHigh.fill, STYLES.placerUnionHigh.hover, STYLES.placerUnionHigh.default);
         layer.bindPopup(buildPopupContent(districtName, candidates, '#C2185B'));
-
-        layer.on('click', (event) => {
-          L.DomEvent.stopPropagation(event);
-        });
       }
     });
-    map.on('click', (event) => {
-      if (!map.hasLayer(placerUnionHighDistrictsGeoLayer)) return;
-
-      let hitDistrict = false;
-      placerUnionHighDistrictsGeoLayer.eachLayer((districtLayer) => {
-        if (!hitDistrict && districtLayer.feature && turf.booleanPointInPolygon(
-          turf.point([event.latlng.lng, event.latlng.lat]),
-          districtLayer.feature
-        )) {
-          hitDistrict = true;
-        }
-      });
-
-      if (hitDistrict) return;
-
-      map.removeLayer(placerUnionHighDistrictsGeoLayer);
-
-      if (!map.hasLayer(highSchoolDistrictsGeoLayer)) {
-        highSchoolDistrictsGeoLayer.addTo(map);
-      }
-    });
+    addDrillUpHandler(placerUnionHighDistrictsGeoLayer, highSchoolDistrictsGeoLayer);
 
     rosevilleJointUnionHighDistrictsGeoLayer = L.geoJSON(RJUHSD, {
       style: STYLES.placerUnionHigh.default,
@@ -1150,35 +972,10 @@
 
         addLayerInteractivity(layer, districtName, COLORS.placerUnionHigh.fill, STYLES.placerUnionHigh.hover, STYLES.placerUnionHigh.default);
         layer.bindPopup(buildPopupContent(districtName, candidates, '#FF6B35'));
-
-        layer.on('click', (event) => {
-          L.DomEvent.stopPropagation(event);
-        });
       }
     });
 
-    map.on('click', (event) => {
-      if (!map.hasLayer(rosevilleJointUnionHighDistrictsGeoLayer)) return;
-
-      let hitDistrict = false;
-      rosevilleJointUnionHighDistrictsGeoLayer.eachLayer((districtLayer) => {
-        if (!hitDistrict && districtLayer.feature && turf.booleanPointInPolygon(
-          turf.point([event.latlng.lng, event.latlng.lat]),
-          districtLayer.feature
-        )) {
-          hitDistrict = true;
-        }
-      });
-
-    if (hitDistrict) return;
-
-    map.removeLayer(rosevilleJointUnionHighDistrictsGeoLayer);
-
-    if (!map.hasLayer(highSchoolDistrictsGeoLayer)) {
-      highSchoolDistrictsGeoLayer.addTo(map);
-    }
-  });
-
+    addDrillUpHandler(rosevilleJointUnionHighDistrictsGeoLayer, highSchoolDistrictsGeoLayer);
 
     // =====================================================================
     // LAYER SETUP - SIERRA COLLEGE DISTRICTS
@@ -1189,7 +986,7 @@
       onEachFeature: (feature, layer) => {
         const districtNumber = feature.properties && feature.properties.DISTRICT;
         const districtName = districtNumber ? `SIERRA COLLEGE DISTRICT ${districtNumber}` : 'SIERRA COLLEGE DISTRICT';
-        const candidates = getSierraCollegeCandidates(districtName);
+        const candidates = getDistrictCandidates('sierraCollege', districtName);
         const seatUpForElection = [3, 4, 7].includes(Number(districtNumber));
 
         if (seatUpForElection) {
@@ -1200,7 +997,6 @@
         }
       }
     });
-
 
     // =====================================================================
     // LAYER SETUP - CITIES & TOWNS
@@ -1216,21 +1012,7 @@
         addLayerInteractivity(layer, name, COLORS.cities.fill, STYLES.cities.hover, STYLES.cities.default);
         layer.bindPopup(buildPopupContent(name, candidates, '#FF6B35', 'cities'));
 
-        if (isRoseville) {
-          layer.on('click', (event) => {
-            L.DomEvent.stopPropagation(event);
-
-            if (map.hasLayer(citiesGeoLayer)) {
-              map.removeLayer(citiesGeoLayer);
-            }
-
-            if (!map.hasLayer(rosevilleCouncilDistrictsGeoLayer)) {
-              rosevilleCouncilDistrictsGeoLayer.addTo(map);
-            }
-
-            map.fitBounds(layer.getBounds());
-          });
-        }
+        if (isRoseville) addDrillDownHandler(layer, () => citiesGeoLayer, () => rosevilleCouncilDistrictsGeoLayer);
       }
     });
 
@@ -1248,34 +1030,11 @@
           addLayerInteractivity(layer, districtName, COLORS.rosevilleCouncil.fill, STYLES.rosevilleCouncil.hover, STYLES.rosevilleCouncil.default);
           layer.bindPopup(buildPopupContent(districtName, candidates, '#7C4DFF'));
         }
-
-        layer.on('click', (event) => {
-          L.DomEvent.stopPropagation(event);
-        });
       }
     });
 
-      map.on('click', (event) => {
-            if (!map.hasLayer(rosevilleCouncilDistrictsGeoLayer)) return;
+    addDrillUpHandler(rosevilleCouncilDistrictsGeoLayer, citiesGeoLayer);
 
-            let hitDistrict = false;
-            rosevilleCouncilDistrictsGeoLayer.eachLayer((districtLayer) => {
-              if (!hitDistrict && districtLayer.feature && turf.booleanPointInPolygon(
-                turf.point([event.latlng.lng, event.latlng.lat]),
-                districtLayer.feature
-              )) {
-                hitDistrict = true;
-              }
-            });
-
-            if (hitDistrict) return;
-
-            map.removeLayer(rosevilleCouncilDistrictsGeoLayer);
-
-            if (!map.hasLayer(citiesGeoLayer)) {
-              citiesGeoLayer.addTo(map);
-            }
-          });
     // =====================================================================
     // LAYER SETUP - SUPERVISORIAL DISTRICTS
     // =====================================================================
@@ -1290,22 +1049,6 @@
 
         addLayerInteractivity(layer, name, COLORS.supervisorial.fill, STYLES.supervisorial.hover, STYLES.supervisorial.default, electionMessage);
         layer.bindPopup(buildPopupContent(name, [], '#6C5CE7', 'supervisorial', electionMessage));
-      }
-    });
-
-    // =====================================================================
-    // LAYER SETUP - CONGRESSIONAL DISTRICTS (PROP 50)
-    // =====================================================================
-
-    congressionalGeoLayer = L.geoJSON(CongressionalDistrictsProp50, {
-      style: STYLES.congressional.default,
-      onEachFeature: (feature, layer) => {
-        const districtNumber = feature.properties && feature.properties.DISTRICT;
-        const name = districtNumber ? `CONGRESSIONAL DISTRICT ${districtNumber}` : 'Congressional District';
-        const candidates = CANDIDATES.congressional[name] || [];
-
-        addLayerInteractivity(layer, name, COLORS.congressional.fill, STYLES.congressional.hover, STYLES.congressional.default);
-        layer.bindPopup(buildPopupContent(name, candidates, '#1e4294'));
       }
     });
 
@@ -1342,7 +1085,23 @@
     });
 
     // =====================================================================
-    // LAYER CONTROL - RADIO BUTTONS FOR EXCLUSIVE SELECTION
+    // LAYER SETUP - CONGRESSIONAL DISTRICTS (PROP 50)
+    // =====================================================================
+
+    congressionalGeoLayer = L.geoJSON(CongressionalDistrictsProp50, {
+      style: STYLES.congressional.default,
+      onEachFeature: (feature, layer) => {
+        const districtNumber = feature.properties && feature.properties.DISTRICT;
+        const name = districtNumber ? `CONGRESSIONAL DISTRICT ${districtNumber}` : 'Congressional District';
+        const candidates = CANDIDATES.congressional[name] || [];
+
+        addLayerInteractivity(layer, name, COLORS.congressional.fill, STYLES.congressional.hover, STYLES.congressional.default);
+        layer.bindPopup(buildPopupContent(name, candidates, '#1e4294'));
+      }
+    });
+
+    // =====================================================================
+    // LAYER CONTROL - RADIO BUTTONS
     // =====================================================================
 
     const layerControlDiv = L.DomUtil.create('div', 'leaflet-control-layers leaflet-control map-overlay-control');
@@ -1402,53 +1161,35 @@
 
     map.addControl(new layerControl());
 
+    const overlayLayers = {
+      elementary: ElementarySchoolDistrictsGeoLayer,
+      highschool: highSchoolDistrictsGeoLayer,
+      sierraCollege: sierraCollegeGeoLayer,
+      cities: citiesGeoLayer,
+      supervisorial: supervisorialGeoLayer,
+      congressional: congressionalGeoLayer,
+      assembly: assemblyGeoLayer,
+      senate: senateGeoLayer
+    };
+
+    // Drill-down sub-layers aren't selectable directly, but must be cleared when switching overlays
+    const drillDownLayers = [
+      rosevilleCouncilDistrictsGeoLayer,
+      westernPlacerDistrictsGeoLayer,
+      rusdGeoLayer,
+      rcsdGeoLayer,
+      DryCreekDistrictsGeoLayer,
+      placerUnionHighDistrictsGeoLayer,
+      rosevilleJointUnionHighDistrictsGeoLayer
+    ];
+
     layerControlDiv.addEventListener('change', (e) => {
       if (e.target.name !== 'overlayLayer') return;
 
-      // Remove all layers
-      map.removeLayer(ElementarySchoolDistrictsGeoLayer);
-      map.removeLayer(highSchoolDistrictsGeoLayer);
-      map.removeLayer(sierraCollegeGeoLayer);
-      map.removeLayer(citiesGeoLayer);
-      map.removeLayer(rosevilleCouncilDistrictsGeoLayer);
-      map.removeLayer(westernPlacerDistrictsGeoLayer);
-      map.removeLayer(rusdGeoLayer);
-      map.removeLayer(rcsdGeoLayer);
-      map.removeLayer(DryCreekDistrictsGeoLayer);
-      map.removeLayer(placerUnionHighDistrictsGeoLayer);
-      map.removeLayer(rosevilleJointUnionHighDistrictsGeoLayer);
-      map.removeLayer(supervisorialGeoLayer);
-      map.removeLayer(congressionalGeoLayer);
-      map.removeLayer(assemblyGeoLayer);
-      map.removeLayer(senateGeoLayer);
+      [...Object.values(overlayLayers), ...drillDownLayers].forEach((layer) => map.removeLayer(layer));
 
-      // Add selected layer
-      switch (e.target.value) {
-        case 'elementary':
-          ElementarySchoolDistrictsGeoLayer.addTo(map);
-          break;
-        case 'highschool':
-          highSchoolDistrictsGeoLayer.addTo(map);
-          break;
-        case 'sierraCollege':
-          sierraCollegeGeoLayer.addTo(map);
-          break;
-        case 'cities':
-          citiesGeoLayer.addTo(map);
-          break;
-        case 'supervisorial':
-          supervisorialGeoLayer.addTo(map);
-          break;
-        case 'congressional':
-          congressionalGeoLayer.addTo(map);
-          break;
-        case 'assembly':
-          assemblyGeoLayer.addTo(map);
-          break;
-        case 'senate':
-          senateGeoLayer.addTo(map);
-          break;
-      }
+      const selectedLayer = overlayLayers[e.target.value];
+      if (selectedLayer) selectedLayer.addTo(map);
     });
 
     // =====================================================================
@@ -1609,8 +1350,8 @@
           displayName: 'SIERRA COLLEGE',
           areaLabel: 'Your Trustee Area',
           getName: (feature) => (feature.properties && feature.properties.DISTRICT ? `SIERRA COLLEGE DISTRICT ${feature.properties.DISTRICT}` : 'Sierra College District'),
-          getCandidates: getAllSierraCollegeCandidates,
-          getShareCandidates: getSierraCollegeCandidates,
+          getCandidates: () => getAllDistrictCandidates('sierraCollege'),
+          getShareCandidates: (name) => getDistrictCandidates('sierraCollege', name),
           getNote: (name) => {
             const districtNumber = Number((name.match(/\d+/) || [])[0]);
             return [3, 4, 7].includes(districtNumber) ? 'Seat up for election in 2028.' : null;
@@ -1680,7 +1421,7 @@
           areaLabel: 'Your Trustee Area',
           layer: rusdGeoLayer,
           getName: (feature) => (feature.properties && feature.properties.DISTRICT ? `RUSD DISTRICT ${feature.properties.DISTRICT}` : 'RUSD District'),
-          getCandidates: getRusdCandidates
+          getCandidates: (name) => getDistrictCandidates('rusd', name)
         },
         {
           parentType: 'Elementary School District',
@@ -1688,7 +1429,7 @@
           areaLabel: 'Your Trustee Area',
           layer: rcsdGeoLayer,
           getName: (feature) => (feature.properties && feature.properties.DISTRICT ? `RCSD TRUSTEE AREA ${feature.properties.DISTRICT}` : 'RCSD Trustee Area'),
-          getCandidates: getRcsdCandidates
+          getCandidates: (name) => getDistrictCandidates('rcsd', name)
         },
         {
           parentType: 'Elementary School District',
@@ -1696,7 +1437,7 @@
           areaLabel: 'Your Trustee Area',
           layer: DryCreekDistrictsGeoLayer,
           getName: (feature) => (feature.properties && feature.properties.name ? `TRUSTEE AREA ${feature.properties.name}` : 'Trustee Area'),
-          getCandidates: getDryCreekCandidates
+          getCandidates: (name) => getDistrictCandidates('dryCreek', name)
         },
         {
           parentType: 'High School District',
