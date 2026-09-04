@@ -3856,7 +3856,7 @@
             },
             "properties": {
                 "Board_of_E": "Placer County Board of Education Trustee Area 1",
-                "TRUSTEE AREA": 1
+                "TRUSTEEAREA": 1
             }
         },
         {
@@ -6806,7 +6806,7 @@
             },
             "properties": {
                 "Board_of_E": "Placer County Board of Education Trustee Area 2",
-                "TRUSTEE AREA": 2
+                "TRUSTEEAREA": 2
             }
         },
         {
@@ -10664,7 +10664,7 @@
             },
             "properties": {
                 "Board_of_E": "Placer County Board of Education Trustee Area 3",
-                "TRUSTEE AREA": 3
+                "TRUSTEEAREA": 3
             }
         },
         {
@@ -16786,7 +16786,7 @@
             },
             "properties": {
                 "Board_of_E": "Placer County Board of Education Trustee Area 4",
-                "TRUSTEE AREA": 4
+                "TRUSTEEAREA": 4
             }
         },
         {
@@ -27464,7 +27464,7 @@
             },
             "properties": {
                 "Board_of_E": "Placer County Board of Education Trustee Area 5",
-                "TRUSTEE AREA": 5
+                "TRUSTEEAREA": 5
             }
         },
         {
@@ -46014,7 +46014,7 @@
             },
             "properties": {
                 "Board_of_E": "Placer County Board of Education Trustee Area 6",
-                "TRUSTEE AREA": 6
+                "TRUSTEEAREA": 6
             }
         },
         {
@@ -126246,7 +126246,7 @@
             },
             "properties": {
                 "Board_of_E": "Placer County Board of Education Trustee Area 7",
-                "TRUSTEE AREA": 7
+                "TRUSTEEAREA": 7
             }
         },
         {
@@ -128272,8 +128272,8 @@
             },
             "properties": {
                 "Board_of_E": "Sacramento County Board of Education Trustee Area 2",
-                "TRUSTEE AREA": "",
-                "SAC TRUSTEE AREA": 2
+                "TRUSTEEAREA": "Sacramento County Board of Education Trustee Area 2",
+                "SACTRUSTEE ": 2
             }
         },
         {
