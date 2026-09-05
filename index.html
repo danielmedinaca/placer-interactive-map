@@ -338,6 +338,7 @@
     function getCityCandidates(name) {
       const normalizedName = normalizeDistrictName(name);
       if (normalizedName === 'ROSEVILLE') return getAllDistrictCandidates('rosevilleCouncil');
+      if (normalizedName === 'LINCOLN') return getAllDistrictCandidates('lincolnCouncil');
       return CANDIDATES.cities[normalizedName] || [];
     }
 
@@ -645,15 +646,11 @@
         "TRUSTEE AREA 2": [],
         "TRUSTEE AREA 3": [],
         "TRUSTEE AREA 4": [],
-        "TRUSTEE AREA 5": [
-          { name: "Tracy Balcom", position: "Trustee Area 5", website: "https://www.drtracybalcom.info/" }
-        ]
+        "TRUSTEE AREA 5": []
       },
       placerUnionHigh: {
         "TRUSTEE AREA 1": [],
-        "TRUSTEE AREA 2": [
-          { name: "Kim Barry", position: "Trustee Area 2", website: "https://www.kimbarry4puhsd.com/" }
-        ],
+        "TRUSTEE AREA 2": [],
         "TRUSTEE AREA 3": [],
         "TRUSTEE AREA 4": [
           { name: "David Lawrenson", position: "Trustee Area 4", website: "https://www.davelawrenson.com/" }
@@ -680,14 +677,24 @@
         "TRUSTEE AREA 6": [],
         "TRUSTEE AREA 7": []
       },
+      placerBOEDistricts: {
+        "BOARD OF EDUCATION TRUSTEE AREA 1": [
+          { name: "Robert Gonzalez", position: "Trustee Area 1", website: "" }
+        ],
+        "BOARD OF EDUCATION TRUSTEE AREA 2": [],
+        "BOARD OF EDUCATION TRUSTEE AREA 3": [],
+        "BOARD OF EDUCATION TRUSTEE AREA 4": [],
+        "BOARD OF EDUCATION TRUSTEE AREA 5": [],
+        "BOARD OF EDUCATION TRUSTEE AREA 6": [],
+        "BOARD OF EDUCATION TRUSTEE AREA 7": []
+      },
       cities: {
         "AUBURN": [
           { name: "Kelley Davis", position: "Auburn City Council At-Large", website: "https://www.kelleyforcouncil.net/" }
         ],
         "ROCKLIN": [
           { name: "Walter Moore", position: "Rocklin City Council At-Large", website: "" }
-        ],
-        "LINCOLN": []
+        ]
       },
       rosevilleCouncil: {
         "DISTRICT 1": [],
@@ -698,6 +705,13 @@
         "DISTRICT 4": [
           { name: "Rick Bartee", position: "Roseville City Council District 4", website: "https://rickforroseville.com/" }
         ],
+        "DISTRICT 5": []
+      },
+      lincolnCouncil: {
+        "DISTRICT 1": [],
+        "DISTRICT 2": [],
+        "DISTRICT 3": [],
+        "DISTRICT 4": [],
         "DISTRICT 5": []
       },
       assembly: {
@@ -740,16 +754,18 @@
       RCSDDistricts,
       DryCreekDistricts,
       HighSchoolDistricts,
-      SierraCollegeDistricts,
-      RosevilleCityCouncilDistrict,
       WesternPlacerDistrict,
       RUSDDistricts,
       PlacerUnionHighSchoolDistrict,
       RJUHSD,
+      SierraCollegeDistricts,
+      RosevilleCityCouncilDistrict,
+      LincolnCityCouncilDistricts,
+      PlacerBOEDistricts,
       SupervisorialDistricts,
-      CongressionalDistrictsProp50,
       AssemblyDistricts,
-      SenateDistricts
+      SenateDistricts,
+      CongressionalDistrictsProp50
     ] = await Promise.all([
       'county.geojson',
       'cities.geojson',
@@ -757,16 +773,18 @@
       'RCSDDistricts.geojson',
       'DryCreekDistricts.geojson',
       'HighSchoolDistricts.geojson',
-      'SierraCollegeDistricts.geojson',
-      'RosevilleCityCouncilDistrict.geojson',
       'WesternPlacerDistrict.geojson',
       'RUSDDistricts.geojson',
       'PlacerUnionHighSchoolDistrict.geojson',
       'RJUHSD.geojson',
+      'SierraCollegeDistricts.geojson',
+      'RosevilleCityCouncilDistrict.geojson',
+      'LincolnCityCouncilDistricts.geojson',
+      'PlacerBOE.geojson',
       'SupervisorialDistricts.geojson',
-      'CongressionalDistrictsProp50.geojson',
       'AssemblyDistricts.geojson',
-      'SenateDistricts.geojson'
+      'SenateDistricts.geojson',
+      'CongressionalDistrictsProp50.geojson'
     ].map(loadGeoJSON));
 
     // =====================================================================
@@ -831,11 +849,27 @@
       });
     }
 
+    // LAYER SETUP
+
+    let ElementarySchoolDistrictsGeoLayer,
+        highSchoolDistrictsGeoLayer,
+        sierraCollegeGeoLayer,
+        rcsdGeoLayer,
+        westernPlacerDistrictsGeoLayer,
+        rusdGeoLayer,
+        DryCreekDistrictsGeoLayer,
+        placerUnionHighDistrictsGeoLayer,
+        rosevilleJointUnionHighDistrictsGeoLayer,
+        supervisorialGeoLayer,
+        placerBOEDistrictsGeoLayer,
+        assemblyGeoLayer,
+        senateGeoLayer,
+        congressionalGeoLayer;
+
     // =====================================================================
     // LAYER SETUP - ELEMENTARY SCHOOL DISTRICTS PARENT LAYER
     // =====================================================================
 
-    let ElementarySchoolDistrictsGeoLayer, highSchoolDistrictsGeoLayer, sierraCollegeGeoLayer, citiesGeoLayer, rosevilleCouncilDistrictsGeoLayer, rcsdGeoLayer, westernPlacerDistrictsGeoLayer, rusdGeoLayer, DryCreekDistrictsGeoLayer, placerUnionHighDistrictsGeoLayer, rosevilleJointUnionHighDistrictsGeoLayer, supervisorialGeoLayer, congressionalGeoLayer, assemblyGeoLayer, senateGeoLayer;
 
     ElementarySchoolDistrictsGeoLayer = L.geoJSON(ElementarySchoolDistricts, {
       style: STYLES.elementary.default,
@@ -999,8 +1033,9 @@
     });
 
     // =====================================================================
-    // LAYER SETUP - CITIES & TOWNS
+    // LAYER SETUP - CITIES & TOWNS PARENT
     // =====================================================================
+    let citiesGeoLayer, rosevilleCouncilDistrictsGeoLayer, LincolnCityCouncilDistrictsGeoLayer;
 
     citiesGeoLayer = L.geoJSON(placerCities, {
       style: STYLES.cities.default,
@@ -1013,8 +1048,14 @@
         layer.bindPopup(buildPopupContent(name, candidates, '#FF6B35', 'cities'));
 
         if (isRoseville) addDrillDownHandler(layer, () => citiesGeoLayer, () => rosevilleCouncilDistrictsGeoLayer);
+        if (name.toUpperCase() === 'LINCOLN') addDrillDownHandler(layer, () => citiesGeoLayer, () => LincolnCityCouncilDistrictsGeoLayer);
       }
     });
+
+    // =====================================================================
+    // LAYER SETUP - ROSEVILLE CITY COUNCIL DISTRICTS
+    // =====================================================================
+
 
     rosevilleCouncilDistrictsGeoLayer = L.geoJSON(RosevilleCityCouncilDistrict, {
       style: STYLES.rosevilleCouncil.default,
@@ -1036,6 +1077,29 @@
     addDrillUpHandler(rosevilleCouncilDistrictsGeoLayer, citiesGeoLayer);
 
     // =====================================================================
+    // LAYER SETUP - LINCON CITY COUNCIL DISTRICTS
+    // =====================================================================
+
+    LincolnCityCouncilDistrictsGeoLayer = L.geoJSON(LincolnCityCouncilDistricts, {
+      style: STYLES.rosevilleCouncil.default,
+      onEachFeature: (feature, layer) => {
+        const districtNumber = feature.properties && feature.properties.DISTRICT;
+        const districtName = districtNumber ? `DISTRICT ${districtNumber}` : 'CITY COUNCIL DISTRICT';
+        const candidates = CANDIDATES.lincolnCouncil[districtName] || [];
+        const noElection = [1, 3, 5].includes(Number(districtNumber));
+
+        if (noElection) {
+          addLayerInteractivity(layer, districtName, COLORS.rosevilleCouncil.fill, STYLES.rosevilleCouncil.hover, STYLES.rosevilleCouncil.default, "Seat up for election in 2028");
+        } else {
+          addLayerInteractivity(layer, districtName, COLORS.rosevilleCouncil.fill, STYLES.rosevilleCouncil.hover, STYLES.rosevilleCouncil.default);
+          layer.bindPopup(buildPopupContent(districtName, candidates, '#7C4DFF'));
+        }
+      }
+    });
+
+        addDrillUpHandler(LincolnCityCouncilDistrictsGeoLayer, citiesGeoLayer);
+
+    // =====================================================================
     // LAYER SETUP - SUPERVISORIAL DISTRICTS
     // =====================================================================
 
@@ -1052,6 +1116,31 @@
       }
     });
 
+    // =====================================================================
+    // LAYER SETUP - PLACER BOARD OF EDUCATION DISTRICTS
+    // =====================================================================
+
+    placerBOEDistrictsGeoLayer = L.geoJSON(PlacerBOEDistricts, {
+    style: STYLES.rcsd.default,
+    onEachFeature: (feature, layer) => {
+    // 1. Get district number safely regardless of key name or spaces
+      const districtNumber = feature.properties && (feature.properties['TRUSTEE AREA'] ?? feature.properties.TRUSTEEAREA);
+      const districtName = districtNumber ? `BOARD OF EDUCATION TRUSTEE AREA ${districtNumber}` : 'Board of Education Trustee Area';
+      const candidates = CANDIDATES.placerBOEDistricts[districtName] || [];
+    // 2. Check election cycle (1, 3, 5 up in 2028)
+      const noElection = [2, 3, 5].includes(Number(districtNumber));
+
+    if (noElection) {
+      const electionMsg = "Seat up for election in 2028";
+      addLayerInteractivity(layer, districtName, COLORS.rcsd.fill, STYLES.rcsd.hover, STYLES.rcsd.default, electionMsg);
+      layer.bindPopup(buildPopupContent(districtName, [], COLORS.rcsd.fill, 'supervisorial', electionMsg));
+    } else {
+      
+      addLayerInteractivity(layer, districtName, COLORS.rcsd.fill, STYLES.rcsd.hover, STYLES.rcsd.default);
+      layer.bindPopup(buildPopupContent(districtName, candidates, COLORS.rcsd.fill, 'districts'));
+    }
+  }
+});
     // =====================================================================
     // LAYER SETUP - STATE ASSEMBLY DISTRICTS
     // =====================================================================
@@ -1128,6 +1217,9 @@
             <input type="radio" name="overlayLayer" value="supervisorial" /> Supervisorial Districts
           </label>
           <label style="display: block; margin-bottom: 6px;">
+            <input type="radio" name="overlayLayer" value="placerBOE" /> Placer Board of Education Districts
+          </label>
+          <label style="display: block; margin-bottom: 6px;">
             <input type="radio" name="overlayLayer" value="assembly" /> State Assembly Districts
           </label>
           <label style="display: block; margin-bottom: 6px;">
@@ -1167,6 +1259,7 @@
       sierraCollege: sierraCollegeGeoLayer,
       cities: citiesGeoLayer,
       supervisorial: supervisorialGeoLayer,
+      placerBOE: placerBOEDistrictsGeoLayer,
       congressional: congressionalGeoLayer,
       assembly: assemblyGeoLayer,
       senate: senateGeoLayer
@@ -1175,6 +1268,7 @@
     // Drill-down sub-layers aren't selectable directly, but must be cleared when switching overlays
     const drillDownLayers = [
       rosevilleCouncilDistrictsGeoLayer,
+      LincolnCityCouncilDistrictsGeoLayer,
       westernPlacerDistrictsGeoLayer,
       rusdGeoLayer,
       rcsdGeoLayer,
@@ -1405,6 +1499,18 @@
           getNote: (name) => {
             const districtNumber = Number((name.match(/\d+/) || [])[0]);
             return [1, 3, 5].includes(districtNumber) ? 'Seat up for election in 2028.' : null;
+          }
+        },
+        {
+          parentType: 'City / Town',
+          parentName: 'LINCOLN',
+          areaLabel: 'Your City Council District',
+          layer: LincolnCityCouncilDistrictsGeoLayer,
+          getName: (feature) => (feature.properties && feature.properties.DISTRICT ? `DISTRICT ${feature.properties.DISTRICT}` : 'City Council District'),
+          getCandidates: (name) => CANDIDATES.lincolnCouncil[name],
+          getNote: (name) => {
+            const districtNumber = Number((name.match(/\d+/) || [])[0]);
+            return [3, 4, 5].includes(districtNumber) ? 'Seat up for election in 2028.' : null;
           }
         },
         {
@@ -1698,6 +1804,7 @@
     // elementary school districts: https://gis-placercounty.opendata.arcgis.com/datasets/0f0396305ff742edafb774a3566b83e0_0/explore?location=39.015624%2C-120.743882%2C10
     // high school districts (extracted from all CA school districts): https://gis.data.ca.gov/datasets/b0e3b936426a47ce9d9a2e77e2bb86cc_0/explore?location=38.643173%2C-119.627662%2C8
     // Placer Supervisorial districts: https://hub.arcgis.com/datasets/56dd78c2dc5a40eaa695ab53d9749b88_0/explore?location=38.888358%2C-120.952770%2C11
+    // Lincoln City Council Districts: https://cityoflincoln.maps.arcgis.com/apps/instant/lookup/index.html?appid=72ba5b2c26d4493f80d0c233bfa53fcc
     // Roseville City Council districts: https://data-roseville.opendata.arcgis.com/datasets/2426efca77884f0aae31995c58067ce2_6/explore?location=38.770500%2C-121.331300%2C13
     // Western Placer districts (extracted): https://experience.arcgis.com/experience/bdbd70fd26bc41de8addc3ab1bc39ca3
     // RUSD (extracted): https://experience.arcgis.com/experience/35634bed26e44fa4904a3fdc7c6e75b2
