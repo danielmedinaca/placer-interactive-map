@@ -434,7 +434,7 @@
     const DATA_BASE_URL = 'https://cdn.jsdelivr.net/gh/danielmedinaca/placer-interactive-map@main';
 
     function loadGeoJSON(fileName) {
-      return fetch(`${DATA_BASE_URL}/${fileName}`).then((response) => response.json());
+      return fetch(`${DATA_BASE_URL}/${fileName}?v=${Date.now()}`).then((response) => response.json());
     }
 
     // =====================================================================
@@ -679,7 +679,7 @@
       },
       placerBOEDistricts: {
         "BOARD OF EDUCATION TRUSTEE AREA 1": [
-          { name: "Robert Gonzalez", position: "Trustee Area 1", website: "" }
+          { name: "Nora Parella", position: "Trustee Area 1", website: "https://noraforplacer.com/" }
         ],
         "BOARD OF EDUCATION TRUSTEE AREA 2": [],
         "BOARD OF EDUCATION TRUSTEE AREA 3": [],
@@ -1024,7 +1024,7 @@
         const seatUpForElection = [3, 4, 7].includes(Number(districtNumber));
 
         if (seatUpForElection) {
-          addLayerInteractivity(layer, districtName, COLORS.sierraCollege.fill, STYLES.sierraCollege.hover, STYLES.sierraCollege.default, 'Seat up for election in 2028');
+          addLayerInteractivity(layer, districtName, "COLORS.sierraCollege.fill", STYLES.sierraCollege.hover, "STYLES.sierraCollege.default", 'Seat up for election in 2028');
         } else {
           addLayerInteractivity(layer, districtName, COLORS.sierraCollege.fill, STYLES.sierraCollege.hover, STYLES.sierraCollege.default);
           layer.bindPopup(buildPopupContent(districtName, candidates, COLORS.sierraCollege.fill));
@@ -1128,7 +1128,7 @@
       const districtName = districtNumber ? `BOARD OF EDUCATION TRUSTEE AREA ${districtNumber}` : 'Board of Education Trustee Area';
       const candidates = CANDIDATES.placerBOEDistricts[districtName] || [];
     // 2. Check election cycle (1, 3, 5 up in 2028)
-      const noElection = [2, 3, 5].includes(Number(districtNumber));
+      const noElection = [2, 3, 5, 7].includes(Number(districtNumber));
 
     if (noElection) {
       const electionMsg = "Seat up for election in 2028";
@@ -1217,7 +1217,7 @@
             <input type="radio" name="overlayLayer" value="supervisorial" /> Supervisorial Districts
           </label>
           <label style="display: block; margin-bottom: 6px;">
-            <input type="radio" name="overlayLayer" value="placerBOE" /> Placer Board of Education Districts
+            <input type="radio" name="overlayLayer" value="placerBOE" /> Board of Education Districts
           </label>
           <label style="display: block; margin-bottom: 6px;">
             <input type="radio" name="overlayLayer" value="assembly" /> State Assembly Districts
