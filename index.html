@@ -357,8 +357,6 @@
 
     function buildPopupContent(name, candidates, accentColor, type = "district", message = "") {
       const labels = {
-        cities: { heading: 'City Council', empty: 'city' },
-        supervisorial: { heading: 'Board of Supervisors', empty: 'supervisorial district' },
         district: { heading: 'Endorsed', empty: 'district' }
       };
       const labelConfig = labels[type] || labels.district;
@@ -531,6 +529,10 @@
       text: {
         primary: '#1e4294',
         secondary: '#666'
+      },
+      offCycle: {
+        fill: '#B0BEC5',
+        hover: '#B0BEC5'
       }
     };
 
@@ -590,6 +592,10 @@
       congressional: {
         default: { color: COLORS.congressional.fill, weight: 2, fillColor: COLORS.congressional.fill, fillOpacity: 0.25 },
         hover: { color: COLORS.congressional.hover, weight: 3, fillColor: COLORS.congressional.fill, fillOpacity: 0.45 }
+      },
+      offCycle: {
+        default: { color: '#ffffff', weight: 2, fillColor: COLORS.offCycle.fill, fillOpacity: 0.25 },
+        hover: { color: COLORS.offCycle.hover, weight: 3, fillColor: COLORS.offCycle.fill, fillOpacity: 0.45 }
       }
     };
 
@@ -1012,27 +1018,6 @@
     addDrillUpHandler(rosevilleJointUnionHighDistrictsGeoLayer, highSchoolDistrictsGeoLayer);
 
     // =====================================================================
-    // LAYER SETUP - SIERRA COLLEGE DISTRICTS
-    // =====================================================================
-
-    sierraCollegeGeoLayer = L.geoJSON(SierraCollegeDistricts, {
-      style: STYLES.sierraCollege.default,
-      onEachFeature: (feature, layer) => {
-        const districtNumber = feature.properties && feature.properties.DISTRICT;
-        const districtName = districtNumber ? `SIERRA COLLEGE DISTRICT ${districtNumber}` : 'SIERRA COLLEGE DISTRICT';
-        const candidates = getDistrictCandidates('sierraCollege', districtName);
-        const seatUpForElection = [3, 4, 7].includes(Number(districtNumber));
-
-        if (seatUpForElection) {
-          addLayerInteractivity(layer, districtName, "COLORS.sierraCollege.fill", STYLES.sierraCollege.hover, "STYLES.sierraCollege.default", 'Seat up for election in 2028');
-        } else {
-          addLayerInteractivity(layer, districtName, COLORS.sierraCollege.fill, STYLES.sierraCollege.hover, STYLES.sierraCollege.default);
-          layer.bindPopup(buildPopupContent(districtName, candidates, COLORS.sierraCollege.fill));
-        }
-      }
-    });
-
-    // =====================================================================
     // LAYER SETUP - CITIES & TOWNS PARENT
     // =====================================================================
     let citiesGeoLayer, rosevilleCouncilDistrictsGeoLayer, LincolnCityCouncilDistrictsGeoLayer;
@@ -1098,7 +1083,44 @@
     });
 
         addDrillUpHandler(LincolnCityCouncilDistrictsGeoLayer, citiesGeoLayer);
+  
+    // =====================================================================
+    // LAYER SETUP - SIERRA COLLEGE DISTRICTS
+    // =====================================================================
 
+    sierraCollegeGeoLayer = L.geoJSON(SierraCollegeDistricts, {
+      style: (feature) => {
+        const districtNumber = feature.properties && feature.properties.DISTRICT;
+        const noElection = [2, 3, 5, 7].includes(Number(districtNumber));
+        if (noElection) {
+              return {
+                ...STYLES.offCycle.default
+              };
+            }
+
+            return STYLES.sierraCollege.default;
+          },
+      
+      onEachFeature: (feature, layer) => {
+        const districtNumber = feature.properties && feature.properties.DISTRICT;
+        const districtName = districtNumber ? `SIERRA COLLEGE DISTRICT ${districtNumber}` : 'SIERRA COLLEGE DISTRICT';
+        const candidates = getDistrictCandidates('sierraCollege', districtName);
+        const noElection = [2, 3, 5, 7].includes(Number(districtNumber));
+
+
+        if (noElection) {
+          const electionMsg = "Seat up for election in 2028";
+          
+          const offCycleDefault = { ...STYLES.elementary.default, fillColor: '#B0BEC5', fillOpacity: 0.35 };
+          const offCycleHover = { ...STYLES.elementary.hover, fillColor: '#90A4AE', fillOpacity: 0.5, color: '#90A4AE' };
+
+          addLayerInteractivity(layer, districtName, '#78909C', offCycleHover, offCycleDefault, electionMsg);
+        } else {
+          addLayerInteractivity(layer, districtName, COLORS.sierraCollege.fill, STYLES.sierraCollege.hover, STYLES.sierraCollege.default, "Click for candidates");
+          layer.bindPopup(buildPopupContent(districtName, candidates, COLORS.sierraCollege.fill, 'district'));
+        }
+      }
+    });
     // =====================================================================
     // LAYER SETUP - SUPERVISORIAL DISTRICTS
     // =====================================================================
@@ -1112,35 +1134,46 @@
         const electionMessage = `Seat up for election in ${electionYear}.`;
 
         addLayerInteractivity(layer, name, COLORS.supervisorial.fill, STYLES.supervisorial.hover, STYLES.supervisorial.default, electionMessage);
-        layer.bindPopup(buildPopupContent(name, [], '#6C5CE7', 'supervisorial', electionMessage));
       }
     });
 
     // =====================================================================
     // LAYER SETUP - PLACER BOARD OF EDUCATION DISTRICTS
     // =====================================================================
+placerBOEDistrictsGeoLayer = L.geoJSON(PlacerBOEDistricts, {
+  style: (feature) => {
+    const districtNumber = feature.properties && (feature.properties['TRUSTEE AREA'] ?? feature.properties.TRUSTEEAREA);
+    const noElection = [2, 3, 5, 7].includes(Number(districtNumber));
 
-    placerBOEDistrictsGeoLayer = L.geoJSON(PlacerBOEDistricts, {
-    style: STYLES.rcsd.default,
-    onEachFeature: (feature, layer) => {
-    // 1. Get district number safely regardless of key name or spaces
-      const districtNumber = feature.properties && (feature.properties['TRUSTEE AREA'] ?? feature.properties.TRUSTEEAREA);
-      const districtName = districtNumber ? `BOARD OF EDUCATION TRUSTEE AREA ${districtNumber}` : 'Board of Education Trustee Area';
-      const candidates = CANDIDATES.placerBOEDistricts[districtName] || [];
-    // 2. Check election cycle (1, 3, 5 up in 2028)
-      const noElection = [2, 3, 5, 7].includes(Number(districtNumber));
+    if (noElection) {
+      return {
+        ...STYLES.offCycle.default
+      };
+    }
+
+    return STYLES.rcsd.default;
+  },
+
+  onEachFeature: (feature, layer) => {
+    const districtNumber = feature.properties && (feature.properties['TRUSTEE AREA'] ?? feature.properties.TRUSTEEAREA);
+    const districtName = districtNumber ? `BOARD OF EDUCATION TRUSTEE AREA ${districtNumber}` : 'Board of Education Trustee Area';
+    const candidates = (CANDIDATES.placerBOEDistricts && CANDIDATES.placerBOEDistricts[districtName]) || [];
+    const noElection = [2, 3, 5, 7].includes(Number(districtNumber));
 
     if (noElection) {
       const electionMsg = "Seat up for election in 2028";
-      addLayerInteractivity(layer, districtName, COLORS.rcsd.fill, STYLES.rcsd.hover, STYLES.rcsd.default, electionMsg);
-      layer.bindPopup(buildPopupContent(districtName, [], COLORS.rcsd.fill, 'supervisorial', electionMsg));
-    } else {
       
-      addLayerInteractivity(layer, districtName, COLORS.rcsd.fill, STYLES.rcsd.hover, STYLES.rcsd.default);
-      layer.bindPopup(buildPopupContent(districtName, candidates, COLORS.rcsd.fill, 'districts'));
+      const offCycleDefault = { ...STYLES.elementary.default, fillColor: '#B0BEC5', fillOpacity: 0.35 };
+      const offCycleHover = { ...STYLES.elementary.hover, fillColor: '#90A4AE', fillOpacity: 0.5, color: '#90A4AE' };
+
+      addLayerInteractivity(layer, districtName, '#78909C', offCycleHover, offCycleDefault, electionMsg);
+    } else {
+      addLayerInteractivity(layer, districtName, COLORS.rcsd.fill, STYLES.rcsd.hover, STYLES.rcsd.default, "Click for candidates");
+      layer.bindPopup(buildPopupContent(districtName, candidates, COLORS.rcsd.fill, 'district'));
     }
   }
 });
+
     // =====================================================================
     // LAYER SETUP - STATE ASSEMBLY DISTRICTS
     // =====================================================================
