@@ -674,12 +674,14 @@
       },
       sierraCollege: {
         "TRUSTEE AREA 1": [
-          { name: "Robert Gonzalez", position: "Trustee Area 1", website: "" }
+          { name: "Robert Gonzalez", position: "Trustee Area 1", website: "https://robertforsierra.com/" }
         ],
         "TRUSTEE AREA 2": [],
         "TRUSTEE AREA 3": [],
         "TRUSTEE AREA 4": [],
-        "TRUSTEE AREA 5": [],
+        "TRUSTEE AREA 5": [
+          { name: "Dennis Grossman", position: "Trustee Area 5", website: "https://dennisforsierracollege.com/" }
+        ],
         "TRUSTEE AREA 6": [],
         "TRUSTEE AREA 7": []
       },
@@ -1091,7 +1093,7 @@
     sierraCollegeGeoLayer = L.geoJSON(SierraCollegeDistricts, {
       style: (feature) => {
         const districtNumber = feature.properties && feature.properties.DISTRICT;
-        const noElection = [2, 3, 5, 7].includes(Number(districtNumber));
+        const noElection = [3, 4, 7].includes(Number(districtNumber));
         if (noElection) {
               return {
                 ...STYLES.offCycle.default
@@ -1105,7 +1107,7 @@
         const districtNumber = feature.properties && feature.properties.DISTRICT;
         const districtName = districtNumber ? `SIERRA COLLEGE DISTRICT ${districtNumber}` : 'SIERRA COLLEGE DISTRICT';
         const candidates = getDistrictCandidates('sierraCollege', districtName);
-        const noElection = [2, 3, 5, 7].includes(Number(districtNumber));
+        const noElection = [3, 4, 7].includes(Number(districtNumber));
 
 
         if (noElection) {
